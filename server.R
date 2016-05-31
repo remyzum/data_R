@@ -10,87 +10,94 @@ library(rjson)
 library(rMaps)
 library(plyr)
 
+setwd("/Users/admin/Desktop/Master_DEsiGEO/EcoleDesPonts/TP_Data/SanFransisco_data/Shiny_005")
+data <- read_csv("data5.csv")
+name <- sort(unique(data$Name))
+dayofweek <- sort(unique(data$DayOfWeek))
+
+
+
 shinyServer(function (input, output){
   
-#~~~~~~~~~~~~~ REACTIVES ~~~~~~~~~~~~
+  #~~~~~~~~~~~~~ REACTIVES ~~~~~~~~~~~~
   
-    date_seq <- reactive({seq(input$range[1], input$range[2], by = "day")}) 
-    df0 <- reactive({    
-        if (input$HoursOfDay == "All Day") {InterH <- data}
-        else {InterH <- data[data$FourHours == input$HoursOfDay,]}
-        return(InterH)}) 
-    df1 <- reactive({filter(df0(), dayDate %in% date_seq())})
+  date_seq <- reactive({seq(input$range[1], input$range[2], by = "day")}) 
+  df0 <- reactive({    
+    if (input$HoursOfDay == "All Day") {InterH <- data}
+    else {InterH <- data[data$FourHours == input$HoursOfDay,]}
+    return(InterH)}) 
+  df1 <- reactive({filter(df0(), dayDate %in% date_seq())})
+  
+  #~~~~ Test avec les deux selectinputs
+  datasetCat1 <- reactive({dfcat1<- df1()[df1()$Name == input$Category1,]}) 
+  datasetCat2 <- reactive({dfcat2<- df1()[df1()$Name == input$Category2,]})
+  dataset11 <- reactive({df11<- datasetCat1()[datasetCat1()$DayOfWeek == input$DayOfWeek,]})
+  dataset22 <- reactive({df22<- datasetCat2()[datasetCat2()$DayOfWeek == input$DayOfWeek,]})
+  datasetTEST <- reactive({rbind(dataset11(),dataset22())})
+  #dataset111 <- reactive({ df111 <- ddply(dataset11(), .(Lat, Long), summarise, count = length(Address))})
+  #dataset222 <- reactive({ df222 <- ddply(dataset22(), .(Lat, Long), summarise, count = length(Address))})
+  datasetTTT <- reactive({ ddply(datasetTEST(), .(Lat, Long), summarise, count = length(Address))})
+  
+  #~~~~ Avec Un seul selectinput
+  #dataset <- reactive({df0<- df1()[df1()$Name == input$Category,]}) 
+  #dataset1 <- reactive({df2<- dataset()[dataset()$DayOfWeek == input$DayOfWeek,]}) 
+  #dataset2 <- reactive({ df3 <- ddply(dataset1(), .(Lat, Long), summarise, count = length(Address))})
+  
+  
+  
+  #~~~~~~~~~~~~~ OUTPUT MAPS ~~~~~~~~~~~~    
+  
+  #~~~~~ Tab 1 basemap avec dots et renderleaflet et deux selects inputs dans UI
+  output$map1 <- renderLeaflet({
     
-    #~~~~ Test avec les deux selectinputs
-    datasetCat1 <- reactive({dfcat1<- df1()[df1()$Name == input$Category1,]}) 
-    datasetCat2 <- reactive({dfcat2<- df1()[df1()$Name == input$Category2,]})
-    dataset11 <- reactive({df11<- datasetCat1()[datasetCat1()$DayOfWeek == input$DayOfWeek,]})
-    dataset22 <- reactive({df22<- datasetCat2()[datasetCat2()$DayOfWeek == input$DayOfWeek,]})
-    datasetTEST <- reactive({rbind(dataset11(),dataset22())})
-    #dataset111 <- reactive({ df111 <- ddply(dataset11(), .(Lat, Long), summarise, count = length(Address))})
-    #dataset222 <- reactive({ df222 <- ddply(dataset22(), .(Lat, Long), summarise, count = length(Address))})
-    datasetTTT <- reactive({ ddply(datasetTEST(), .(Lat, Long), summarise, count = length(Address))})
-    
-    #~~~~ Avec Un seul selectinput
-    #dataset <- reactive({df0<- df1()[df1()$Name == input$Category,]}) 
-    #dataset1 <- reactive({df2<- dataset()[dataset()$DayOfWeek == input$DayOfWeek,]}) 
-    #dataset2 <- reactive({ df3 <- ddply(dataset1(), .(Lat, Long), summarise, count = length(Address))})
- 
-
-
-#~~~~~~~~~~~~~ OUTPUT MAPS ~~~~~~~~~~~~    
-      
-    #~~~~~ Tab 1 basemap avec dots et renderleaflet et deux selects inputs dans UI
-    output$map1 <- renderLeaflet({
-        
-      leaflet() %>% setView(lng = -122.431297, lat = 37.773972, zoom = 13) %>%
+    leaflet() %>% setView(lng = -122.431297, lat = 37.773972, zoom = 13) %>%
       addProviderTiles('CartoDB.Positron', options = providerTileOptions(noWrap = TRUE))  
-      leaflet() %>% addTiles() %>%
+    leaflet() %>% addTiles() %>%
       addCircleMarkers(lng = dataset11()$Long, lat = dataset11()$Lat, popup = paste(dataset11()$dayDate), radius=1, fillOpacity = 0.7, color = 'blue', fillColor = 'blue') %>%
       addCircleMarkers(lng = dataset22()$Long, lat = dataset22()$Lat, popup = paste(dataset22()$dayDate), radius=1, fillOpacity = 0.7, color = 'red', fillColor = 'red')
-      })
+  })
+  
+  
+  #~~~~~~~ Tab2 base map avec renderPlot (fixe pas de zoom)
+  output$map2 <- renderPlot({
+    
+    SF <- get_map(location = "sanfrancisco", zoom = 12, source = "osm")
+    ggmap(SF,extend = "panel") 
+    #,base_layer = ggplot(aes(x = Long, y = Lat),data = data))
+  })
+  
+  
+  #~~~ Tab 2 - BasemapAvec RenderMap
+  output$baseMap <- renderMap({
+    baseMap <- Leaflet$new() 
+    baseMap$setView(c(37.773972,-122.431297) ,12) 
+    baseMap$addParams(height = 590, width = 600)
+    baseMap
+  })
+  
+  #~~~ Tab 2 - Heatmap 
+  output$heatMap <- renderUI({
+    
+    ##~~~~~~ Creation de JSON avec 'paste0()'.
     
     
-    #~~~~~~~ Tab2 base map avec renderPlot (fixe pas de zoom)
-    output$map2 <- renderPlot({
-      
-      SF <- get_map(location = "sanfrancisco", zoom = 12, source = "osm")
-      ggmap(SF,extend = "panel") 
-      #,base_layer = ggplot(aes(x = Long, y = Lat),data = data))
-      })
+    j <- paste0("[",datasetTTT()[,"Lat"], ",", datasetTTT()[,"Long"], ",", datasetTTT()[,"count"], "]", collapse=",")
+    j <- paste0("[",j,"]")
     
     
-      #~~~ Tab 2 - BasemapAvec RenderMap
-    output$baseMap <- renderMap({
-      baseMap <- Leaflet$new() 
-      baseMap$setView(c(37.773972,-122.431297) ,12) 
-      baseMap$addParams(height = 590, width = 600)
-      baseMap
-    })
-    
-      #~~~ Tab 2 - Heatmap 
-    output$heatMap <- renderUI({
-      
-        ##~~~~~~ Creation de JSON avec 'paste0()'.
+    ##~~~~~~ Fonctionne et layer ne se superposent pas
+    tags$body(tags$script(HTML(sprintf("
+                                       var addressPoints = %s
+                                       if (typeof heat === typeof undefined) {
+                                       heat = L.heatLayer(addressPoints, {radius: 12,blur: 6,maxZoom: 10,max: 6.0,
+                                       gradient: {0.0: 'green',0.5: 'yellow',1.0: 'red' }}),
+                                       heat.addTo(map)} 
+                                       else {heat.setLatLngs(addressPoints)}", j ))))                                                  
+  })
+  })
 
-      
-      j <- paste0("[",datasetTTT()[,"Lat"], ",", datasetTTT()[,"Long"], ",", datasetTTT()[,"count"], "]", collapse=",")
-      j <- paste0("[",j,"]")
-      
-      
-        ##~~~~~~ Fonctionne et layer ne se superposent pas
-      tags$body(tags$script(HTML(sprintf("
-                                        var addressPoints = %s
-                                         if (typeof heat === typeof undefined) {
-                                           heat = L.heatLayer(addressPoints, {radius: 12,blur: 6,maxZoom: 10,max: 6.0,
-                                                                              gradient: {0.0: 'green',0.5: 'yellow',1.0: 'red' }}),
-                                          heat.addTo(map)} 
-                                          else {heat.setLatLngs(addressPoints)}", j ))))                                                  
-    })
-})
 
-                                                                                
-                                                                                
+
 #~~~~~ Heatmap fonctionne mais layers se superposent => invisible
 #tags$body(tags$script(HTML(sprintf("
 #                                   var addressPoints = %s
@@ -132,6 +139,4 @@ shinyServer(function (input, output){
 #))))
 
 #})
-
-
 
