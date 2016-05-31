@@ -8,7 +8,10 @@ library(magrittr)
 library(leaflet)
 library(rCharts)
 
-setwd("/Users/admin/Desktop/Master_DEsiGEO/EcoleDesPonts/TP_Data/SanFransisco_data/Shiny")
-data <- read_csv2("data3.csv")
+#setwd("/Users/admin/Desktop/Master_DEsiGEO/EcoleDesPonts/TP_Data/SanFransisco_data/Shiny_003")
+data <- read_csv("data5.csv")
 name <- sort(unique(data$Name))
 dayofweek <- sort(unique(data$DayOfWeek))
+
+#map_base <- get_map(location="sanfrancisco",zoom=12,source="osm")
+#map_SF_city <- qmap("sanfrancisco", zoom = 12, source="osm")
